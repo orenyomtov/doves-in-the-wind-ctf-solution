@@ -1,0 +1,16 @@
+{
+  "name": "doves-in-the-wind-ctf-solution",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "hardhat": "^2.11.2",
+    "hardhat-tracer": "^1.1.0-rc.9"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^2.0.0"
+  }
+}
