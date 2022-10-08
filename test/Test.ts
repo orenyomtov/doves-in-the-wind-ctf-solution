@@ -1,71 +1,106 @@
 import { ethers, network } from "hardhat";
-import { SolutionCreator } from "../typechain-types";
+import fetch from 'node-fetch';
 
-const puzzleSolution = "0x00000097aa556c85"
+// Edit the following three lines to match your EOA, deployed contract, and target block number
+const puzzleSolution = "0x0000002ea74414e9"
+const deployedSolutionAddress = "0xa76f94fe2f8499751ad46b83f6533f2b4c3fc4a1"
+const targetBlockNumber = 28166946
+
+const numberOfSpamTxs = 20
+
+async function getOptimismBlockNumber() {
+  const response = await fetch("https://rpc.ankr.com/optimism",
+    { method: 'POST', body: '{"method":"rollup_getInfo","params":[],"id":1,"jsonrpc":"2.0"}' })
+  const json = await response.json()
+  return json.result.rollupContext.index
+}
+
+const providers = [
+  new ethers.providers.JsonRpcProvider("https://opt-mainnet.g.alchemy.com/v2/YOUR_ALCHEMY_KEY_HERE"),
+  new ethers.providers.JsonRpcProvider("https://mainnet.optimism.io"),
+  new ethers.providers.JsonRpcProvider("https://rpc.ankr.com/optimism"),
+  new ethers.providers.JsonRpcProvider("https://optimism-mainnet.public.blastapi.io"),
+  new ethers.providers.JsonRpcProvider("https://1rpc.io/op"),
+]
+
+function sendSignedTransactions(txs: any) {
+  for (const tx of txs) {
+    Promise.all(providers.map(p => p.sendTransaction(tx).catch(console.log)))
+  }
+}
 
 describe("Test", function () {
   it("SolutionCreator", async function () {
     const signer = ethers.provider.getSigner(0);
     const wallet = new ethers.Wallet((network.config.accounts as any)[0].privateKey ?? (network.config.accounts as any)[0])
     const callerAddress = await signer.getAddress();
+    console.log('callerAddress', callerAddress)
 
-    console.log(`callerAddress: ${callerAddress}`)
-    if (/fff.{29}fff$/.test(callerAddress.toLowerCase()) == false) {
-      throw new Error('callerAddress is not a valid address. It needs to end with fff...(29 characters)...fff');
-    }
+    // Uncomment the following block and run "npx hardhat test"  if you want to to test that it works in a local fork
+    // -----
+    // const currentBlock = await ethers.provider.getBlockNumber()
+    // const wantedBlock = 28166946 - 1
+    // console.log(`Current block number: ${currentBlock}`)
 
-    // const SolutionCreator = await ethers.getContractFactory("SolutionCreator", signer);
-    // const solutionCreator = await SolutionCreator.deploy();
-    // await solutionCreator.deployed();
-    const solutionCreator = await ethers.getContractAt("SolutionCreator", "0x700f3524ca5b8c3f5abc602803b2f2106027a989", signer) as SolutionCreator;
 
-    if (network.name == 'hardhat') {
-      await ethers.provider.send("evm_setAutomine", [false]);
-    }
+    // const blockGap = wantedBlock - currentBlock
+    // await ethers.provider.send("hardhat_mine", [`0x${blockGap.toString(16)}`]);
+    // console.log(`Current block number: ${await ethers.provider.getBlockNumber()}`)
 
-    const solutionAddress = await solutionCreator.connect(signer).callStatic.createSolutionContract();
-    // const createSolutionTx = await solutionCreator.connect(signer).createSolutionContract({ gasLimit: 500_000 });
-    const createSolutionPopulatedTx = await signer.populateTransaction(await solutionCreator.connect(signer).populateTransaction.createSolutionContract({ gasLimit: 500_000 }));
-    createSolutionPopulatedTx.gasPrice = 2000000;
 
-    // const challengeTxResponse = await signer.sendTransaction({
+    // // console.log(`Solution: ${await solutionCreator2.connect(signer).getSolution()}`)
+
+    // const challengeTx = await signer.sendTransaction({
     //   to: "0xC8565A653B27FB4Ae88d69e1865A2748b137805a",
-    //   data: `0x00000003${puzzleSolution!.replace('0x', '')}${solutionAddress.replace('0x', '').padStart(48, '0')}`,
+    //   data: `0x00000003${puzzleSolution!.replace('0x', '')}${deployedSolutionAddress.replace('0x', '').padStart(48, '0')}`,
     //   gasLimit: 500_000,
     // })
-    const challengePopulatedTx = await signer.populateTransaction({
+
+    // console.log("challengeTx", await challengeTx.wait())
+
+    // return
+    // ----------
+
+    const populatedTx = await signer.populateTransaction({
       to: "0xC8565A653B27FB4Ae88d69e1865A2748b137805a",
-      data: `0x00000003${puzzleSolution!.replace('0x', '')}${solutionAddress.replace('0x', '').padStart(48, '0')}`,
+      data: `0x00000003${puzzleSolution!.replace('0x', '')}${deployedSolutionAddress.replace('0x', '').padStart(48, '0')}`,
       gasLimit: 500_000,
     })
-    challengePopulatedTx.gasPrice = 2000000;
-    challengePopulatedTx.nonce = Number(challengePopulatedTx.nonce) + 1;
+    populatedTx.gasPrice = 2000000;
 
-    const signedCreateSolutionTx = await wallet.signTransaction(createSolutionPopulatedTx);
-    const signedChallengeTx = await wallet.signTransaction(challengePopulatedTx);
+    const signedTx = await wallet.signTransaction(populatedTx);
+    const signedTxs = []
 
-    console.log(createSolutionPopulatedTx)
-    console.log(challengePopulatedTx)
-
-    console.log(signedCreateSolutionTx)
-    console.log(signedChallengeTx)
-
-    const [createSolutionTx, challengeTxResponse] = await Promise.all([
-      ethers.provider.sendTransaction(signedCreateSolutionTx),
-      ethers.provider.sendTransaction(signedChallengeTx)
-    ])
-
-    if (network.name == 'hardhat') {
-      await ethers.provider.send("evm_mine", []);
+    for (let i = 0; i < numberOfSpamTxs; i++) {
+      signedTxs.push(await wallet.signTransaction({ ...populatedTx, nonce: Number(populatedTx.nonce) + i }))
     }
 
-    const createSolutionReceipt = await createSolutionTx.wait();
-    console.log(createSolutionReceipt)
+    console.log(populatedTx)
+    console.log(signedTx)
+    console.log(signedTxs)
 
-    const solutionDeployedCode = await ethers.provider.getCode(solutionAddress);
-    console.log(`solutionDeployedCode: ${solutionDeployedCode}`);
+    console.log(`Current block number: ${await ethers.provider.getBlockNumber()}`)
+    console.log(`Target block number: ${targetBlockNumber}`)
 
-    const challengeTxReceipt = await challengeTxResponse.wait()
-    console.log(challengeTxReceipt)
+    while (true) {
+      try {
+        const currentBlockNumber = await getOptimismBlockNumber()
+        const blockGap = targetBlockNumber - currentBlockNumber
+        console.log("Optimism block number", currentBlockNumber, "gap to target block number", blockGap)
+        if (blockGap > 0 && blockGap <= (numberOfSpamTxs)) {
+          console.log("Sending txs")
+          for (let i = 0; i < 10; i++) {
+            sendSignedTransactions(signedTxs)
+            await new Promise(resolve => setTimeout(resolve, 250));
+          }
+          break
+        }
+      }
+      catch (e) {
+        console.log(e)
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
   });
 });

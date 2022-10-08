@@ -3,7 +3,7 @@ const { ethers } = require("ethers");
 function solvePuzzle(callerAddress) {
     const nakedAddress = callerAddress.replace('0x', '')
     const hashPrefix = `0x00000003${nakedAddress}`
-    for (let i = (50_000_000_000) * 13; i < 0xFFFFFFFFFFFFFFFF; i++) {
+    for (let i = (50_000_000_000) * 0; i < 0xFFFFFFFFFFFFFFFF; i++) {
         const possibleSolution = i.toString(16).padStart(16, '0');
         const bytesToHash = `${hashPrefix}${possibleSolution}`
         const hash = ethers.utils.keccak256(bytesToHash)
@@ -21,4 +21,6 @@ function solvePuzzle(callerAddress) {
     return 'ERROR';
 }
 
-console.log(solvePuzzle('0x03136ffF250585749c1CE7C89aa3563bF9058FfF'))
+const addr='0x405f4b09fcc3debd5bc2d24748318b341e75ffff'
+console.log('finding puzzle solution for', addr)
+console.log(solvePuzzle(addr))
